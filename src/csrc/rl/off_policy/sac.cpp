@@ -505,9 +505,12 @@ void SACSystem::loadCheckpoint(const std::string& checkpoint_dir) {
 // we should pass a tuple (s, a, s', r, d)
 void SACSystem::updateReplayBuffer(torch::Tensor s, torch::Tensor a, torch::Tensor sp, torch::Tensor r,
                                    torch::Tensor d) {
-  // note that we have to rescale the action: [a_low, a_high] -> [-1, 1],
-  // but the replay buffer only stores scaled actions!
-  replay_buffer_->update(s, a, sp, r, d);
+  // Rescale the physical environment action
+  // [a_low, a_high] -> [-1, 1] before storing it.
+  // SAC critics and the squashed Gaussian policy operate in
+  // this normalized action coordinate system.
+  auto scaled_action = scale_action(a, a_low_, a_high_);
+  replay_buffer_->update(s, scaled_action, sp, r, d);
 }
 
 void SACSystem::updateReplayBuffer(torch::Tensor s, torch::Tensor a, torch::Tensor sp, float r, bool d) {
