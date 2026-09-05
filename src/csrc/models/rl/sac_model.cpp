@@ -11,13 +11,20 @@ namespace torchfort {
 // SACMLP model in C++ using libtorch
 void SACMLPModel::setup(const ParamMap& params) {
   // Extract params from input map.
-  std::set<std::string> supported_params{"dropout", "layer_sizes", "state_dependent_sigma", "log_sigma_init"};
+  std::set<std::string> supported_params{"dropout", "layer_sizes", "state_dependent_sigma",
+                                         "log_sigma_init", "hidden_activation"};
   check_params(supported_params, params.keys());
 
   dropout = params.get_param<double>("dropout", 0.0)[0];
   layer_sizes = params.get_param<int>("layer_sizes");
   state_dependent_sigma = params.get_param<bool>("state_dependent_sigma", true)[0];
+  hidden_activation = params.get_param<std::string>("hidden_activation", "relu")[0];
   double log_sigma_init = params.get_param<double>("log_sigma_init", 0.)[0];
+
+  if (hidden_activation != "relu" && hidden_activation != "softsign") {
+    THROW_INVALID_USAGE("Unsupported SACMLP hidden_activation: " + hidden_activation +
+                        ". Supported values are 'relu' and 'softsign'.");
+  }
 
   // Construct and register submodules.
   for (int i = 0; i < layer_sizes.size() - 1; ++i) {
@@ -66,7 +73,14 @@ std::vector<torch::Tensor> SACMLPModel::forward(const std::vector<torch::Tensor>
   for (int i = 0; i < layer_sizes.size() - 1; ++i) {
     if (i < layer_sizes.size() - 2) {
       // encoder part
-      x = torch::relu(encoder_layers[i]->forward(x) + biases[i]);
+      auto hidden = encoder_layers[i]->forward(x) + biases[i];
+
+      if (hidden_activation == "softsign") {
+        x = torch::nn::functional::softsign(hidden);
+      } else {
+        x = torch::relu(hidden);
+      }
+
       x = torch::dropout(x, dropout, is_training());
     } else {
       // y

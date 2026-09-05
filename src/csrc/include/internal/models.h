@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <vector>
 
 #include <torch/torch.h>
@@ -60,6 +62,7 @@ struct SACMLPModel : BaseModel, public std::enable_shared_from_this<BaseModel> {
   double dropout;
   std::vector<int> layer_sizes;
   bool state_dependent_sigma;
+  std::string hidden_activation;
 
   // A SAC Model has a common encoder and two output layers for mu and log-sigma
   std::vector<torch::nn::Linear> encoder_layers;
