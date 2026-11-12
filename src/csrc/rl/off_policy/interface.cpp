@@ -159,6 +159,35 @@ torchfort_result_t torchfort_rl_off_policy_load_checkpoint(const char* name, con
   return TORCHFORT_RESULT_SUCCESS;
 }
 
+// Frozen SAC inference: load network weights only. Full checkpoints can
+// contain optimizer/replay tensors serialized on CUDA and cannot safely be
+// loaded through the historical loadCheckpoint API on CPU-only allocations.
+torchfort_result_t torchfort_rl_off_policy_load_model(const char* name, const char* checkpoint_dir) {
+  using namespace torchfort;
+
+  try {
+    auto it = rl::off_policy::registry.find(sanitize(name));
+    if (it == rl::off_policy::registry.end() || !it->second) {
+      std::cerr << "TorchFort SAC load_model: unknown system name." << std::endl;
+      return TORCHFORT_RESULT_INVALID_USAGE;
+    }
+
+    auto sac = std::dynamic_pointer_cast<rl::off_policy::SACSystem>(it->second);
+    if (!sac) {
+      std::cerr << "TorchFort load_model is implemented for SAC only." << std::endl;
+      return TORCHFORT_RESULT_NOT_SUPPORTED;
+    }
+    sac->loadModel(checkpoint_dir);
+  } catch (const BaseException& e) {
+    std::cerr << e.what() << std::endl;
+    return e.getResult();
+  } catch (const c10::Error& e) {
+    std::cerr << "TorchFort load_model PyTorch error: " << e.what() << std::endl;
+    return TORCHFORT_RESULT_INTERNAL_ERROR;
+  }
+  return TORCHFORT_RESULT_SUCCESS;
+}
+
 // ready check
 torchfort_result_t torchfort_rl_off_policy_is_ready(const char* name, bool& ready) {
   using namespace torchfort;
