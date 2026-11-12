@@ -502,6 +502,43 @@ void SACSystem::loadCheckpoint(const std::string& checkpoint_dir) {
   }
 }
 
+// Inference-only model loading. Unlike loadCheckpoint(), this reads only
+// model archives with explicit CPU/GPU device mapping supplied by ModelWrapper.
+// GPU-serialized optimizer, replay buffer, entropy temperature and counters
+// are deliberately NOT restored. Suitable for frozen policy prediction, not
+// for resuming SAC training.
+//
+// This historical TorchFort fork has no state-normalizer implementation.
+// The caller must still verify architecture/action bounds and compare
+// identical feature vectors before claiming CPU/GPU policy equivalence.
+void SACSystem::loadModel(const std::string& checkpoint_dir) {
+  std::filesystem::path root_dir(checkpoint_dir);
+
+  auto load_weights = [](auto& pack, const std::filesystem::path& directory) {
+    auto model_path = directory / "model.pt";
+    if (!std::filesystem::exists(model_path)) {
+      THROW_INVALID_USAGE("Could not find " + model_path.native() + ".");
+    }
+    // ModelWrapper::load maps model tensors onto pack.model->device()
+    // (CPU when model_device=-1), even if saved on a CUDA device.
+    pack.model->load(model_path.native());
+    if (pack.optimizer) {
+      pack.optimizer->parameters() = pack.model->parameters();
+    }
+  };
+
+  load_weights(p_model_, root_dir / "policy");
+  for (int i = 0; i < q_models_.size(); ++i) {
+    load_weights(q_models_[i], root_dir / ("critic_" + std::to_string(i)));
+  }
+
+  // Synchronize target critics from restored online critics. No optimizer
+  // state or replay transition is needed for deterministic policy prediction.
+  for (int i = 0; i < q_models_target_.size(); ++i) {
+    copy_parameters(q_models_target_[i].model, q_models_[i].model);
+  }
+}
+
 // we should pass a tuple (s, a, s', r, d)
 void SACSystem::updateReplayBuffer(torch::Tensor s, torch::Tensor a, torch::Tensor sp, torch::Tensor r,
                                    torch::Tensor d) {
