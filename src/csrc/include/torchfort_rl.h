@@ -339,6 +339,19 @@ torchfort_result_t torchfort_rl_off_policy_save_checkpoint(const char* name, con
  */
 torchfort_result_t torchfort_rl_off_policy_load_checkpoint(const char* name, const char* checkpoint_dir);
 
+/**
+ * Load an existing SAC model's policy and online critic WEIGHTS ONLY.
+ *
+ * This is suitable for frozen SAC inference on CPU (model_device=-1):
+ * it does not deserialize CUDA-saved optimizers/replay, alpha optimizer,
+ * target checkpoint files or training counters. Targets are rebuilt
+ * from the online critics. It does NOT resume training.
+ *
+ * The checkpoint directory remains read-only.
+ * This historical fork supports SAC only for this operation.
+ */
+torchfort_result_t torchfort_rl_off_policy_load_model(const char* name, const char* checkpoint_dir);
+
 // RL off-policy miscellaneous utility functions
 /**
  * @brief Queries a reinforcement learning system for rediness to start training
