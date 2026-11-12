@@ -363,6 +363,9 @@ public:
   // saving and loading
   void saveCheckpoint(const std::string& checkpoint_dir) const;
   void loadCheckpoint(const std::string& checkpoint_dir);
+  // CPU-safe frozen inference: restore network weights without CUDA-saved
+  // optimizer, replay-buffer, alpha, or training-state checkpoint data.
+  void loadModel(const std::string& checkpoint_dir);
 
   // info printing
   void printInfo() const;
